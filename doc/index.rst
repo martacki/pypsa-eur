@@ -9,8 +9,8 @@ PyPSA-Eur: An Open Optimisation Model of the European Transmission System
 .. image:: https://img.shields.io/github/v/release/pypsa/pypsa-eur?include_prereleases
     :alt: GitHub release (latest by date including pre-releases)
 
-.. image:: https://travis-ci.org/PyPSA/pypsa-eur.svg?branch=master
-    :target: https://travis-ci.org/PyPSA/pypsa-eur
+.. image:: https://github.com/pypsa/pypsa-eur/actions/workflows/ci.yaml/badge.svg
+    :target: https://github.com/PyPSA/pypsa-eur/actions
 
 .. image:: https://readthedocs.org/projects/pypsa-eur/badge/?version=latest
     :target: https://pypsa-eur.readthedocs.io/en/latest/?badge=latest
@@ -141,7 +141,7 @@ If you are (relatively) new to energy system modelling and optimisation
 and plan to use PyPSA-Eur, the following resources are *one way* to get started
 in addition to reading this documentation.
 
-- Documentation of `PyPSA <https://pypsa.readthedocs.io>`_, the package for
+- Documentation of `PyPSA <https://pypsa.readthedocs.io>`__, the package for
   simulating and optimising modern power systems which PyPSA-Eur uses under the hood.
 - Course on `Energy System Modelling <https://nworbmot.org/courses/esm-2019/>`_,
   Karlsruhe Institute of Technology (KIT), `Dr. Tom Brown <https://nworbmot.org>`_

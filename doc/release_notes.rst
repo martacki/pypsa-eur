@@ -1,5 +1,5 @@
 ..
-  SPDX-FileCopyrightText: 2019-2020 The PyPSA-Eur Authors
+  SPDX-FileCopyrightText: 2019-2021 The PyPSA-Eur Authors
 
   SPDX-License-Identifier: CC-BY-4.0
 
@@ -19,12 +19,19 @@ Upcoming Release
 * Fix: Value for ``co2base`` in ``config.yaml`` adjusted to 1.487e9 t CO2-eq (from 3.1e9 t CO2-eq). The new value represents emissions related to the electricity sector for EU+UK. The old value was ~2x too high and used when the emissions wildcard in ``{opts}`` was used.
 * Add option to include marginal costs of links representing fuel cells, electrolysis, and battery inverters 
   [`#232 <https://github.com/PyPSA/pypsa-eur/pull/232>`_].
+* Add option to pre-aggregate nodes without power injections (positive or negative, i.e. generation or demand) to electrically closest nodes or neighbors in ``simplify_network``. Defaults to ``False``. This affects nodes that are no substations or have no offshore connection.
 * Fix: Add escape in :mod:`base_network` if all TYNDP links are already contained in the network [`#246 <https://github.com/PyPSA/pypsa-eur/pull/246>`_].
 * Bugfix in :mod:`solve_operations_network`: optimised capacities are now fixed for all extendable links, not only HVDC links [`#244 <https://github.com/PyPSA/pypsa-eur/pull/244>`_].
 * The ``focus_weights`` are now also considered when pre-clustering in the :mod:`simplify_network` rule [`#241 <https://github.com/PyPSA/pypsa-eur/pull/241>`_].
+* Continuous integration testing switches to Github Actions from Travis CI [`#252 <https://github.com/PyPSA/pypsa-eur/pull/252>`_].
+* Bugfix in :mod:`build_renewable_profile` where offshore wind profiles could no longer be created [`#249 <https://github.com/PyPSA/pypsa-eur/pull/249>`_].
+* Implements changes to ``n.snapshot_weightings`` in upcoming PyPSA version (cf. `PyPSA/PyPSA/#227 <https://github.com/PyPSA/PyPSA/pull/227>`_) [`#259 <https://github.com/PyPSA/pypsa-eur/pull/259>`_].
+* Bugfix: Lower expansion limit of extendable carriers is now set to the existing capacity, i.e. ``p_nom_min = p_nom`` (0 before). Simultaneously, the upper limit (``p_nom_max``) is now the maximum of the installed capacity (``p_nom``) and the previous estimate based on land availability (``p_nom_max``) [`#260 <https://github.com/PyPSA/pypsa-eur/pull/260>`_].
+* Bugfix: Solving an operations network now includes optimized store capacities as well. Before only lines, links, generators and storage units were considered.
+* Bugfix: With ``load_shedding: true`` in the solving options of ``config.yaml`` load shedding generators are only added at the AC buses, excluding buses for H2 and battery stores.
 
 PyPSA-Eur 0.3.0 (7th December 2020)
-==================================
+===================================
 
 **New Features**
 

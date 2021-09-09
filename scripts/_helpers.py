@@ -119,11 +119,19 @@ def load_network_for_plots(fn, tech_costs, config, combine_hydro_ps=True):
     # bus_carrier = n.storage_units.bus.map(n.buses.carrier)
     # n.storage_units.loc[bus_carrier == "heat","carrier"] = "water tanks"
 
-    Nyears = n.snapshot_weightings.sum() / 8760.
+    Nyears = n.snapshot_weightings.objective.sum() / 8760.
     costs = load_costs(Nyears, tech_costs, config['costs'], config['electricity'])
     update_transmission_costs(n, costs)
 
     return n
+
+def update_p_nom_max(n):
+    # if extendable carriers (solar/onwind/...) have capacity >= 0,
+    # e.g. existing assets from the OPSD project are included to the network,
+    # the installed capacity might exceed the expansion limit.
+    # Hence, we update the assumptions.
+    
+    n.generators.p_nom_max = n.generators[['p_nom_min', 'p_nom_max']].max(1)
 
 def aggregate_p_nom(n):
     return pd.concat([
