@@ -19,6 +19,10 @@ scenario:
 
 countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK']
 
+clustering:
+  simplify:
+    to_substations: false # network is simplified to nodes with positive or negative power injection (i.e. substations or offwind connections)
+
 snapshots:
   start: "2013-01-01"
   end: "2014-01-01"
@@ -36,7 +40,7 @@ enable:
 electricity:
   voltages: [220., 300., 380.]
   co2limit: 7.75e+7 # 0.05 * 3.1e9*0.5
-  co2base: 1.487e9
+  co2base: 1.487e+9
   agg_p_nom_limits: data/agg_p_nom_minmax.csv
 
   extendable_carriers:
