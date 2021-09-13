@@ -295,7 +295,8 @@ def busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights=None, algori
         elif algorithm == "louvain":
             return prefix + busmap_by_louvain(reduce_network(n, x), n_clusters[x.name], **algorithm_kwds)
         elif algorithm == "hac":
-            feature = snakemake.config['clustering']['feature']
+            feature = "solar+onwind-time" #snakemake.config['clustering']['feature']
+            logger.warning("careful, feature for hac is fixed to solar+onwind-time!")
             return prefix + busmap_by_hac(n, n_clusters[x.name], buses_i=x.index, feature=feature)
         else:
             raise ValueError(f"`algorithm` must be one of 'kmeans', 'spectral', 'hac' or 'louvain'. Is {algorithm}.")
@@ -315,25 +316,32 @@ def clustering_for_n_clusters(n, n_clusters, custom_busmap=False, aggregate_carr
     else:
         raise AttributeError(f"potential_mode should be one of 'simple' or 'conservative' but is '{potential_mode}'")
 
-    if custom_busmap:
-        busmap = pd.read_csv(snakemake.input.custom_busmap, index_col=0, squeeze=True)
-        busmap.index = busmap.index.astype(str)
-        logger.info(f"Imported custom busmap from {snakemake.input.custom_busmap}")
+    if custom_busmap is not None:
+        if isinstance(custom_busmap, bool):
+            busmap = pd.read_csv(snakemake.input.custom_busmap, index_col=0, squeeze=True)
+            busmap.index = busmap.index.astype(str)
+            logger.info(f"Imported custom busmap from {snakemake.input.custom_busmap}")
+        else:
+            busmap = custom_busmap #should be pd.Series...
+            logger.info("using given busmap...")
     else:
         busmap = busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights, algorithm)
 
-    if snakemake.config.get('decompose', None) is not None:
-        country_buses = n.buses[n.buses.country.isin(snakemake.config['decompose'])].index
-        inter_lines = n.lines[((n.lines.bus0.isin(country_buses)) & (~n.lines.bus1.isin(country_buses))) |
-                              ((n.lines.bus1.isin(country_buses)) & (~n.lines.bus0.isin(country_buses)))][['bus0', 'bus1']]
-        inter_links = n.links[((n.links.bus0.isin(country_buses)) & (~n.links.bus1.isin(country_buses))) |
-                              ((n.links.bus1.isin(country_buses)) & (~n.links.bus0.isin(country_buses)))][['bus0', 'bus1']]
-        border_buses_lines = set(inter_lines['bus0']).union(inter_lines['bus1'])#.intersection(country_buses)
-        border_buses_links = set(inter_links['bus0']).union(inter_links['bus1'])#.intersection(country_buses)
-        border_buses = list(border_buses_lines.union(border_buses_links))
-        border_buses_map = [n.buses.loc[bus].country + ' ' + bus for bus in border_buses]
-        #print(border_buses_map)
-        busmap[border_buses] = border_buses_map
+    #if snakemake.config.get('decompose', None) is not None:
+    #    decompose_c = snakemake.config['decompose']
+
+    #    country_buses = n.buses.query("country in @decompose_c").index
+        
+    #    query = "bus0 in @country_buses and not bus1 in @country_buses or bus1 in @country_buses and not bus0 in @country_buses"
+    #    inter_lines = n.lines.query(query)[['bus0', 'bus1']]
+    #    inter_links = n.links.query(query)[['bus0', 'bus1']]
+
+    #    border_buses_lines = set(inter_lines['bus0']).union(inter_lines['bus1'])#.intersection(country_buses)
+    #    border_buses_links = set(inter_links['bus0']).union(inter_links['bus1'])#.intersection(country_buses)
+    #    border_buses = list(border_buses_lines.union(border_buses_links))
+
+    #    border_buses_map = [n.buses.loc[bus].country + ' ' + bus for bus in border_buses]
+    #    busmap[border_buses] = border_buses_map
 
     clustering = get_clustering_from_busmap(
         n, busmap,

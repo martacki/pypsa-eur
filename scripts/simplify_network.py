@@ -354,7 +354,7 @@ def aggregate_to_substations(n, buses_i=None):
                                             aggregate_generators_carriers=None,
                                             aggregate_one_ports=["Load", "StorageUnit"],
                                             line_length_factor=1.0,
-                                            generator_strategies={'p_nom_max': 'sum'},
+                                            generator_strategies={'p_nom_max': 'sum', 'p_nom_min': 'sum'},
                                             scale_link_capital_costs=False)
         
     return clustering.network, busmap

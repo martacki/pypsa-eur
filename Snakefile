@@ -175,40 +175,6 @@ if config['enable'].get('retrieve_natura_raster', True):
         shell: "mv {input} {output}"
 
 
-rule build_renewable_profiles:
-    input:
-        base_network="networks/base.nc",
-        corine="data/bundle/corine/g250_clc06_V18_5.tif",
-        natura="resources/natura.tiff",
-        gebco=lambda w: ("data/bundle/GEBCO_2014_2D.nc"
-                         if "max_depth" in config["renewable"][w.technology].keys()
-                         else []),
-        country_shapes='resources/country_shapes.geojson',
-        offshore_shapes='resources/offshore_shapes.geojson',
-        regions=lambda w: ("resources/regions_onshore.geojson"
-                                   if w.technology in ('onwind', 'solar')
-                                   else "resources/regions_offshore.geojson"),
-        cutout=lambda w: "cutouts/" + config["renewable"][w.technology]['cutout'] + ".nc"
-    output: profile="resources/profile_{technology}.nc",
-    log: "logs/build_renewable_profile_{technology}.log"
-    benchmark: "benchmarks/build_renewable_profiles_{technology}"
-    threads: ATLITE_NPROCESSES
-    resources: mem=ATLITE_NPROCESSES * 5000
-    script: "scripts/build_renewable_profiles.py"
-
-
-if 'hydro' in config['renewable'].keys():
-    rule build_hydro_profile:
-        input:
-            country_shapes='resources/country_shapes.geojson',
-            eia_hydro_generation='data/bundle/EIA_hydro_generation_2000_2014.csv',
-            cutout="cutouts/" + config["renewable"]['hydro']['cutout'] + ".nc"
-        output: 'resources/profile_hydro.nc'
-        log: "logs/build_hydro_profile.log"
-        resources: mem=5000
-        script: 'scripts/build_hydro_profile.py'
-
-
 rule add_electricity:
     input:
         base_network='networks/base.nc',
@@ -338,6 +304,36 @@ rule solve_operations_network:
     resources: mem=(lambda w: 5000 + 372 * int(w.clusters))
     shadow: "shallow"
     script: "scripts/solve_operations_network.py"
+
+
+#### DECOMPOSITION RULES + ADDITIONS
+rule prepare_coarse_network:
+    input:
+        network="networks/elec_s.nc",
+        tech_costs=COSTS
+    output:
+        network="results/networks/elec_s_dec:{cntry}_ec_lv1.0_Co2L0.0-6H.nc",
+        busmap="resources/busmap_elec_s_dec:{cntry}_ec_lv1.0_Co2L0.0-6H.csv",
+    log: "logs/prepare_coarse_network/elec_s_dec:{cntry}_ec_lv1.0_Co2L0.0-6H.nc"
+    benchmark: "benchmarks/prepare_coarse_network/elec_s_dec:{cntry}_ec_lv1.0_Co2L0.0-6H"
+    threads: 4
+    resources: mem=500
+    shadow: "shallow"
+    script: "scripts/prepare_coarse_network.py"
+
+
+rule prepare_and_solve_subproblem:
+    input:
+        network_fine="networks/elec_s_{clusters}_ec_lv1.0_Co2L0.0-6H.nc",
+        network_coarse="results/networks/elec_s_89_ec_lv1.0_Co2L0.0-6H.nc",
+        busmap_fine="resources/busmap_elec_s_{clusters}.csv"
+    output: "results/networks/elec_s_{clusters}_dec:{cntry}_ec_lv1.0_Co2L0.0-6H.nc"
+    log: "logs/prepare_and_solve_subproblem/elec_s_{clusters}_dec:{cntry}_ec_lv1.0_Co2L0.0-6H.log"
+    benchmark: "benchmarks/prepare_and_solve_subproblem/elec_s_{clusters}_dec:{cntry}_ec_lv1.0_Co2L0.0-6H"
+    threads: 4
+    resources: mem=(lambda w: 5000 + 372 * int(w.clusters))
+    shadow: "shallow"
+    script: "scripts/prepare_and_solve_subproblem.py"
 
 
 rule plot_network:
