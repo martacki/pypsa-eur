@@ -310,12 +310,16 @@ rule solve_operations_network:
 rule prepare_coarse_network:
     input:
         network="networks/elec_s.nc",
+        busmap="resources/busmap_elec_s_{clusters}.csv",
         tech_costs=COSTS
     output:
-        network="results/networks/elec_s_dec:{cntry}_ec_lv1.0_Co2L0.0-6H.nc",
-        busmap="resources/busmap_elec_s_dec:{cntry}_ec_lv1.0_Co2L0.0-6H.csv",
-    log: "logs/prepare_coarse_network/elec_s_dec:{cntry}_ec_lv1.0_Co2L0.0-6H.nc"
-    benchmark: "benchmarks/prepare_coarse_network/elec_s_dec:{cntry}_ec_lv1.0_Co2L0.0-6H"
+        network="results/networks/elec_s_dec:{cntry}_{clusters}_ec_l{ll}_{opts}.nc",
+        busmap="resources/busmap_elec_s_dec:{cntry}_{clusters}_ec_l{ll}_{opts}.csv",
+    log:
+        solver = "logs/prepare_coarse_network/elec_s_dec:{cntry}_{clusters}_ec_l{ll}_{opts}_solver.log",
+        python = "logs/prepare_coarse_network/elec_s_dec:{cntry}_{clusters}_ec_l{ll}_{opts}_python.log",
+        memory = "logs/prepare_coarse_network/elec_s_dec:{cntry}_{clusters}_ec_l{ll}_{opts}_memory.log"
+    benchmark: "benchmarks/prepare_coarse_network/elec_s_dec:{cntry}_{clusters}_ec_l{ll}_{opts}"
     threads: 4
     resources: mem=500
     shadow: "shallow"

@@ -316,32 +316,16 @@ def clustering_for_n_clusters(n, n_clusters, custom_busmap=False, aggregate_carr
     else:
         raise AttributeError(f"potential_mode should be one of 'simple' or 'conservative' but is '{potential_mode}'")
 
-    if custom_busmap is not None:
-        if isinstance(custom_busmap, bool):
+    if isinstance(custom_busmap, bool):
+        if custom_busmap == True:
             busmap = pd.read_csv(snakemake.input.custom_busmap, index_col=0, squeeze=True)
             busmap.index = busmap.index.astype(str)
             logger.info(f"Imported custom busmap from {snakemake.input.custom_busmap}")
         else:
-            busmap = custom_busmap #should be pd.Series...
-            logger.info("using given busmap...")
+            busmap = busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights, algorithm)
     else:
-        busmap = busmap_for_n_clusters(n, n_clusters, solver_name, focus_weights, algorithm)
-
-    #if snakemake.config.get('decompose', None) is not None:
-    #    decompose_c = snakemake.config['decompose']
-
-    #    country_buses = n.buses.query("country in @decompose_c").index
-        
-    #    query = "bus0 in @country_buses and not bus1 in @country_buses or bus1 in @country_buses and not bus0 in @country_buses"
-    #    inter_lines = n.lines.query(query)[['bus0', 'bus1']]
-    #    inter_links = n.links.query(query)[['bus0', 'bus1']]
-
-    #    border_buses_lines = set(inter_lines['bus0']).union(inter_lines['bus1'])#.intersection(country_buses)
-    #    border_buses_links = set(inter_links['bus0']).union(inter_links['bus1'])#.intersection(country_buses)
-    #    border_buses = list(border_buses_lines.union(border_buses_links))
-
-    #    border_buses_map = [n.buses.loc[bus].country + ' ' + bus for bus in border_buses]
-    #    busmap[border_buses] = border_buses_map
+        busmap = custom_busmap #should be pd.Series...
+        logger.info("using given busmap...")
 
     clustering = get_clustering_from_busmap(
         n, busmap,
