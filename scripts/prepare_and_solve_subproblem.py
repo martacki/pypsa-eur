@@ -21,33 +21,19 @@ def adjust_demand(n_fine, n_coarse, busmap_fine, decompose_c):
     
     country_buses = n_coarse.buses.query("country == @decompose_c").index
 
-    for linequery, bus, p in [("bus0 in @country_buses and not bus1 in @country_buses", "bus0", "p0"),
-                              ("bus1 in @country_buses and not bus0 in @country_buses", "bus1", "p1")]:
+    for branch_c in ["lines", "links"]:
+        for linequery, bus, p in [("bus0 in @country_buses and not bus1 in @country_buses", "bus0", "p0"),
+                                  ("bus1 in @country_buses and not bus0 in @country_buses", "bus1", "p1")]:
     
-        #adapt (lines):
-        lines_i = n_coarse.lines.query(linequery).index
+            #adapt (lines):
+            lines_i = getattr(n_coarse, branch_c).query(linequery).index
+            buses_i = getattr(n_coarse, branch_c).loc[lines_i][bus]
 
-        buses_i = n_coarse.lines.loc[lines_i][bus]#.apply(lambda b: b.split(' ')[1]).astype(int)
-        #buses_i = busmap_fine.loc[buses_i]
+            flows_b = getattr(n_coarse, branch_c + "_t")[p].groupby(buses_i, axis=1).sum()
 
-        grouper = buses_i #pd.Series(buses_i.values, index=lines_i)
-        flows_b = n_coarse.lines_t[p].groupby(grouper, axis=1).sum()
+            buses_i_fine = [bus.split('dec')[0][:-1] for bus in buses_i.unique()]
 
-        buses_i_fine = [bus.split('dec')[0][:-1] for bus in buses_i.unique()]
-        n_fine.loads_t.p_set[buses_i_fine]+=flows_b[buses_i.unique()]
-
-        #adapt (links):
-        links_i = n_coarse.links.query(linequery).index
-    
-        buses_i = n_coarse.links.loc[links_i][bus]#.apply(lambda b: b.split(' ')[1]).astype(int)
-        #buses_i = busmap_fine.loc[buses_i]
-
-        grouper = buses_i #pd.Series(buses_i.values, index=links_i)
-    
-        flows_b = n_coarse.links_t[p].groupby(grouper, axis=1).sum()
-
-        buses_i_fine = [bus.split('dec')[0][:-1] for bus in buses_i.unique()]
-        n_fine.loads_t.p_set[buses_i_fine]+=flows_b[buses_i.unique()]        
+            n_fine.loads_t.p_set[buses_i_fine]+=flows_b[buses_i.unique()]
 
     return n_fine
 
