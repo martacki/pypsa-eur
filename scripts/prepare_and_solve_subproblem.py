@@ -14,6 +14,9 @@ import pandas as pd
 
 from _helpers import configure_logging
 
+from solve_network import prepare_network, solve_network
+from vresutils.benchmark import memory_logger
+
 def adjust_demand(n_fine, n_coarse, busmap_fine, decompose_c):
     
     country_buses = n_coarse.buses.query("country == @decompose_c").index
@@ -24,26 +27,28 @@ def adjust_demand(n_fine, n_coarse, busmap_fine, decompose_c):
         #adapt (lines):
         lines_i = n_coarse.lines.query(linequery).index
 
-        buses_i = n_coarse.lines.loc[lines_i][bus].apply(lambda b: b.split(' ')[1]).astype(int)
-        buses_i = busmap_fine.loc[buses_i]
+        buses_i = n_coarse.lines.loc[lines_i][bus]#.apply(lambda b: b.split(' ')[1]).astype(int)
+        #buses_i = busmap_fine.loc[buses_i]
 
-        grouper = pd.Series(buses_i.values, index=lines_i)
+        grouper = buses_i #pd.Series(buses_i.values, index=lines_i)
         flows_b = n_coarse.lines_t[p].groupby(grouper, axis=1).sum()
-        
-        n_fine.loads_t.p_set[buses_i.unique()]+=flows_b[buses_i.unique()]
+
+        buses_i_fine = [bus.split('dec')[0][:-1] for bus in buses_i.unique()]
+        n_fine.loads_t.p_set[buses_i_fine]+=flows_b[buses_i.unique()]
 
         #adapt (links):
         links_i = n_coarse.links.query(linequery).index
     
-        buses_i = n_coarse.links.loc[links_i][bus].apply(lambda b: b.split(' ')[1]).astype(int)
-        buses_i = busmap_fine.loc[buses_i]
+        buses_i = n_coarse.links.loc[links_i][bus]#.apply(lambda b: b.split(' ')[1]).astype(int)
+        #buses_i = busmap_fine.loc[buses_i]
 
-        grouper = pd.Series(buses_i.values, index=links_i)
+        grouper = buses_i #pd.Series(buses_i.values, index=links_i)
     
         flows_b = n_coarse.links_t[p].groupby(grouper, axis=1).sum()
 
-        n_fine.loads_t.p_set[buses_i.unique()]+=flows_b[buses_i.unique()]
-        
+        buses_i_fine = [bus.split('dec')[0][:-1] for bus in buses_i.unique()]
+        n_fine.loads_t.p_set[buses_i_fine]+=flows_b[buses_i.unique()]        
+
     return n_fine
 
 def drop_components(n, decompose_c):
@@ -84,10 +89,51 @@ if __name__ == "__main__":
     n_fine = pypsa.Network(snakemake.input.network_fine) #unsolved fine network for a subproblem (read from reference network?)
 
     busmap_fine = pd.read_csv(snakemake.input.busmap_fine, index_col=0, squeeze=True, dtype=str)
+    busmap_fine.index = busmap_fine.index.astype(str)
     
     adjust_demand(n_fine, n_coarse, busmap_fine, snakemake.wildcards.cntry)
 
     n_fine = drop_components(n_fine, snakemake.wildcards.cntry)
 
-    print(martha)
-    n.export_to_netcdf(snakemake.output[0])
+    ### SOLVE NETWORK WITH ADDITIONAL CONSTRAINTS...
+    tmpdir = snakemake.config['solving'].get('tmpdir')
+    
+    if tmpdir is not None:
+        Path(tmpdir).mkdir(parents=True, exist_ok=True)
+        
+    opts = snakemake.wildcards.opts.split('-')
+    solve_opts = snakemake.config['solving']['options']
+
+    fn = getattr(snakemake.log, 'memory', None)
+    with memory_logger(filename=fn, interval=30.) as mem:
+        n_fine = prepare_network(n_fine, solve_opts)
+        n_fine = solve_network(n_fine, config=snakemake.config, opts=opts,
+                               solver_dir=tmpdir,
+                               solver_logfile=snakemake.log.solver1)
+        n_fine.export_to_netcdf(snakemake.output.network_dec)
+
+    logger.info("Maximum memory usage: {}".format(mem.mem_usage))
+
+    ### SOLVE SINGLE COUNTRY; FOR REFERENCE...
+    n_fine = pypsa.Network(snakemake.input.network_fine) #unsolved fine network for a subproblem (read from reference network?)
+
+    n_fine = drop_components(n_fine, snakemake.wildcards.cntry)
+
+    tmpdir = snakemake.config['solving'].get('tmpdir')
+    
+    if tmpdir is not None:
+        Path(tmpdir).mkdir(parents=True, exist_ok=True)
+        
+    opts = snakemake.wildcards.opts.split('-')
+    solve_opts = snakemake.config['solving']['options']
+
+    fn = getattr(snakemake.log, 'memory', None)
+    with memory_logger(filename=fn, interval=30.) as mem:
+        n_fine = prepare_network(n_fine, solve_opts)
+        n_fine = solve_network(n_fine, config=snakemake.config, opts=opts,
+                               solver_dir=tmpdir,
+                               solver_logfile=snakemake.log.solver2)
+        n_fine.export_to_netcdf(f"results/networks/elec_s_dec:{snakemake.wildcards.cntry}_{snakemake.wildcards.clusters}_ev_lv1.0_{snakemake.wildcards.opts}.nc")
+
+    logger.info("Maximum memory usage: {}".format(mem.mem_usage))
+    

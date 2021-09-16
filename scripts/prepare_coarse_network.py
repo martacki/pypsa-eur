@@ -23,21 +23,22 @@ from prepare_network import (set_line_s_max_pu, average_every_nhours, add_co2lim
 from solve_network import prepare_network, solve_network
 from vresutils.benchmark import memory_logger
 
-def adjust_busmap_for_decomposition(busmap, decompose_c):
+
+def adjust_busmap_for_decomposition(busmap_ref, busmap_fine, decompose_c):
     country_buses = n.buses.query("country == @decompose_c").index
         
     query = "bus0 in @country_buses and not bus1 in @country_buses or bus1 in @country_buses and not bus0 in @country_buses"
     inter_lines = n.lines.query(query)[['bus0', 'bus1']]
     inter_links = n.links.query(query)[['bus0', 'bus1']]
 
-    border_buses_lines = set(inter_lines['bus0']).union(inter_lines['bus1'])#.intersection(country_buses)
-    border_buses_links = set(inter_links['bus0']).union(inter_links['bus1'])#.intersection(country_buses)
+    border_buses_lines = set(inter_lines['bus0']).union(inter_lines['bus1'])##.intersection(country_buses) ???
+    border_buses_links = set(inter_links['bus0']).union(inter_links['bus1'])##.intersection(country_buses) ???
     border_buses = list(border_buses_lines.union(border_buses_links))
 
-    border_buses_map = [n.buses.loc[bus].country + ' ' + bus for bus in border_buses]
-    busmap[border_buses] = border_buses_map
+    border_buses_map = [bus + ' dec' for bus in busmap_fine[border_buses].values]#[n.buses.loc[bus].country + ' ' + bus for bus in border_buses]
+    busmap_ref[border_buses] = border_buses_map
 
-    return busmap
+    return busmap_ref
 
 
 if __name__ == "__main__":
@@ -48,10 +49,13 @@ if __name__ == "__main__":
 
     focus_weights = snakemake.config.get('focus_weights', None)
 
-    busmap = pd.read_csv(snakemake.input.busmap, index_col=0, squeeze=True)
+    busmap = pd.read_csv(snakemake.input.busmap, dtype=str, index_col=0, squeeze=True)
     busmap.index = busmap.index.astype(str)
 
-    busmap = adjust_busmap_for_decomposition(busmap, decompose_c=snakemake.wildcards.cntry)
+    busmap_fine = pd.read_csv(snakemake.input.busmap_fine, dtype=str, index_col=0, squeeze=True)
+    busmap_fine.index = busmap_fine.index.astype(str)
+
+    busmap = adjust_busmap_for_decomposition(busmap, busmap_fine, decompose_c=snakemake.wildcards.cntry)
 
     Nyears = n.snapshot_weightings.objective.sum()/8760
     costs = (load_costs(Nyears, tech_costs=snakemake.input.tech_costs,
