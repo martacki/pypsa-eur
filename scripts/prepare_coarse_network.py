@@ -40,6 +40,29 @@ def adjust_busmap_for_decomposition(busmap_ref, busmap_fine, decompose_c):
 
     return busmap_ref
 
+def focus_weights_for_decomposition(decompose_c, cntries, weight=2.):
+
+    buses_i = n.buses.query('country == @decompose_c').index
+
+    query = "bus0 in @buses_i and bus1 not in @buses_i or bus1 in @buses_i and bus0 not in @buses_i"
+
+    buses_n = set(n.lines.query(query).bus0).union(set(n.lines.query(query).bus1))#-set(buses_i)
+    buses_n = buses_n.union(set(n.links.query(query).bus0).union(set(n.links.query(query).bus0)))
+
+    neighbors_c = n.buses.loc[buses_n].country.unique()
+
+    focus_weights = dict()
+
+    cntries_n = set(cntries).intersection(set(neighbors_c))
+
+    for c in cntries:
+        if c in cntries_n:
+            focus_weights[c] = weight/(weight*len(cntries_n)+len(set(cntries)-set(cntries_n)))
+        else:
+            focus_weights[c] = 1/(weight*len(cntries_n)+len(set(cntries)-set(cntries_n)))
+
+    return focus_weights
+
 
 if __name__ == "__main__":
 
@@ -47,7 +70,7 @@ if __name__ == "__main__":
 
     n = pypsa.Network(snakemake.input.network)
 
-    focus_weights = snakemake.config.get('focus_weights', None)
+    focus_weights = focus_weights_for_decomposition(snakemake.wildcards.cntry, snakemake.config['countries'], weight=3)
 
     busmap = pd.read_csv(snakemake.input.busmap, dtype=str, index_col=0, squeeze=True)
     busmap.index = busmap.index.astype(str)
