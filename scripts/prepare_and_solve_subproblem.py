@@ -30,10 +30,11 @@ def adjust_demand(n_fine, n_coarse, busmap_fine, decompose_c):
             buses_i = getattr(n_coarse, branch_c).loc[lines_i][bus]
 
             flows_b = getattr(n_coarse, branch_c + "_t")[p].groupby(buses_i, axis=1).sum()
+            flows_b.columns=[bus.split('dec')[0][:-1] for bus in flows_b.columns]
 
             buses_i_fine = [bus.split('dec')[0][:-1] for bus in buses_i.unique()]
 
-            n_fine.loads_t.p_set[buses_i_fine]+=flows_b[buses_i.unique()]
+            n_fine.loads_t.p_set[buses_i_fine] += flows_b[buses_i_fine]
 
     return n_fine
 
@@ -95,31 +96,8 @@ if __name__ == "__main__":
         n_fine = prepare_network(n_fine, solve_opts)
         n_fine = solve_network(n_fine, config=snakemake.config, opts=opts,
                                solver_dir=tmpdir,
-                               solver_logfile=snakemake.log.solver1)
+                               solver_logfile=snakemake.log.solver)
         n_fine.export_to_netcdf(snakemake.output.network_dec)
-
-    logger.info("Maximum memory usage: {}".format(mem.mem_usage))
-
-    ### SOLVE SINGLE COUNTRY; FOR REFERENCE...
-    n_fine = pypsa.Network(snakemake.input.network_fine) #unsolved fine network for a subproblem (read from reference network?)
-
-    n_fine = drop_components(n_fine, snakemake.wildcards.cntry)
-
-    tmpdir = snakemake.config['solving'].get('tmpdir')
-    
-    if tmpdir is not None:
-        Path(tmpdir).mkdir(parents=True, exist_ok=True)
-        
-    opts = snakemake.wildcards.opts.split('-')
-    solve_opts = snakemake.config['solving']['options']
-
-    fn = getattr(snakemake.log, 'memory', None)
-    with memory_logger(filename=fn, interval=30.) as mem:
-        n_fine = prepare_network(n_fine, solve_opts)
-        n_fine = solve_network(n_fine, config=snakemake.config, opts=opts,
-                               solver_dir=tmpdir,
-                               solver_logfile=snakemake.log.solver2)
-        n_fine.export_to_netcdf(f"results/networks/elec_s_dec:{snakemake.wildcards.cntry}_{snakemake.wildcards.clusters}_ev_lv1.0_{snakemake.wildcards.opts}.nc")
 
     logger.info("Maximum memory usage: {}".format(mem.mem_usage))
     

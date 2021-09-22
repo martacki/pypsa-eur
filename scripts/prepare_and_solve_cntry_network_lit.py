@@ -1,14 +1,5 @@
-# SPDX-FileCopyrightText: : 2017-2020 The PyPSA-Eur Authors
-#
-# SPDX-License-Identifier: GPL-3.0-or-later
-
-# coding: utf-8
-"""
-...
-"""
 
 import pypsa
-import logging
 import re
 
 import numpy as np
@@ -16,7 +7,7 @@ import pandas as pd
 
 from _helpers import configure_logging, update_p_nom_max
 from add_electricity import load_costs, add_nice_carrier_names
-from cluster_network import busmap_for_n_clusters, clustering_for_n_clusters
+from cluster_network import distribute_clusters, clustering_for_n_clusters
 from add_extra_components import attach_storageunits, attach_stores, attach_hydrogen_pipelines
 from prepare_network import (set_line_s_max_pu, average_every_nhours, add_co2limit,
                              set_transmission_limit, set_line_nom_max)
@@ -24,45 +15,12 @@ from solve_network import prepare_network, solve_network
 from vresutils.benchmark import memory_logger
 
 
-def adjust_busmap_for_decomposition(busmap_ref, busmap_fine, decompose_c):
+def adjust_busmap_for_lit_decomposition(busmap_ref, busmap_fine, decompose_c):
     country_buses = n.buses.query("country == @decompose_c").index
         
-    query = "bus0 in @country_buses and not bus1 in @country_buses or bus1 in @country_buses and not bus0 in @country_buses"
-    inter_lines = n.lines.query(query)[['bus0', 'bus1']]
-    inter_links = n.links.query(query)[['bus0', 'bus1']]
-
-    border_buses_lines = set(inter_lines['bus0']).union(inter_lines['bus1'])##.intersection(country_buses) ???
-    border_buses_links = set(inter_links['bus0']).union(inter_links['bus1'])##.intersection(country_buses) ???
-    border_buses = list(border_buses_lines.union(border_buses_links))
-    border_buses = busmap_fine[busmap_fine.isin(busmap_fine[border_buses].values)].index #use all buses with the same name
-
-    border_buses_map = [bus + ' dec' for bus in busmap_fine[border_buses].values]#[n.buses.loc[bus].country + ' ' + bus for bus in border_buses]
-    busmap_ref[border_buses] = border_buses_map
+    busmap_ref[country_buses] = busmap_fine[country_buses]
 
     return busmap_ref
-
-def focus_weights_for_decomposition(decompose_c, cntries, weight=5.):
-
-    buses_i = n.buses.query('country == @decompose_c').index
-
-    query = "bus0 in @buses_i and bus1 not in @buses_i or bus1 in @buses_i and bus0 not in @buses_i"
-
-    buses_n = set(n.lines.query(query).bus0).union(set(n.lines.query(query).bus1))#-set(buses_i)
-    buses_n = buses_n.union(set(n.links.query(query).bus0).union(set(n.links.query(query).bus0)))
-
-    neighbors_c = n.buses.loc[buses_n].country.unique()
-
-    focus_weights = dict()
-
-    cntries_n = set(cntries).intersection(set(neighbors_c))
-
-    for c in cntries:
-        if c in cntries_n:
-            focus_weights[c] = weight/(weight*len(cntries_n)+len(set(cntries)-set(cntries_n)))
-        else:
-            focus_weights[c] = 1/(weight*len(cntries_n)+len(set(cntries)-set(cntries_n)))
-
-    return focus_weights
 
 
 if __name__ == "__main__":
@@ -70,22 +28,41 @@ if __name__ == "__main__":
     # CLUSTER NETWORK...
 
     n = pypsa.Network(snakemake.input.network)
-
-    #focus_weights = focus_weights_for_decomposition(snakemake.wildcards.cntry, snakemake.config['countries'],
-    #                                                weight=3)
-    #
-    #busmap = busmap_for_n_clusters(n, int(snakemake.wildcards.refclusters), 'gurobi',
-    #                               focus_weights=focus_weights, algorithm="hac")
+    n.determine_network_topology()
 
     focus_weights = None
-
-    busmap = pd.read_csv(snakemake.input.busmap, dtype=str, index_col=0, squeeze=True)
-    busmap.index = busmap.index.astype(str)
 
     busmap_fine = pd.read_csv(snakemake.input.busmap_fine, dtype=str, index_col=0, squeeze=True)
     busmap_fine.index = busmap_fine.index.astype(str)
 
-    busmap = adjust_busmap_for_decomposition(busmap, busmap_fine, decompose_c=snakemake.wildcards.cntry)
+    busmap_dec = pd.read_csv(snakemake.input.busmap_dec, dtype=str, index_col=0, squeeze=True)
+    busmap_dec.index = busmap_dec.index.astype(str)
+
+    print('n_clusters must be', len(busmap_dec.unique()))
+    
+    refclusters = 37
+    n_per_counry = distribute_clusters(n, refclusters, solver_name='gurobi')
+    
+    current_clusters = (n_per_counry.sum()
+                        - n_per_counry.loc[snakemake.wildcards.cntry].sum()
+                        + len(busmap_fine[busmap_fine.str.startswith(snakemake.wildcards.cntry)].unique()))
+    
+    print('is', current_clusters)
+
+    if current_clusters < len(busmap_dec.unique()):
+        while current_clusters != len(busmap_dec.unique()):
+            refclusters += 1
+            n_per_counry = distribute_clusters(n, refclusters, solver_name='gurobi')
+            current_clusters = (n_per_counry.sum()
+                                - n_per_counry.loc[snakemake.wildcards.cntry].sum()
+                                + len(busmap_fine[busmap_fine.str.startswith(snakemake.wildcards.cntry)].unique()))
+
+    busmap = pd.read_csv(f"resources/busmap_elec_s_{refclusters}.csv", dtype=str, index_col=0, squeeze=True)
+    busmap.index = busmap.index.astype(str)
+
+    print('converged to', refclusters, current_clusters)
+
+    busmap = adjust_busmap_for_lit_decomposition(busmap, busmap_fine, decompose_c=snakemake.wildcards.cntry)
 
     Nyears = n.snapshot_weightings.objective.sum()/8760
     costs = (load_costs(Nyears, tech_costs=snakemake.input.tech_costs,
@@ -177,7 +154,7 @@ if __name__ == "__main__":
     if 'Ep' in opts:
         add_emission_prices(n)
 
-    ll_type, factor = snakemake.wildcards.ll[0], snakemake.wildcards.ll[1:]
+    ll_type, factor = 'v', '1.0'
     set_transmission_limit(n, ll_type, factor, costs, Nyears)
 
     set_line_nom_max(n, s_nom_max_set=snakemake.config["lines"].get("s_nom_max,", np.inf),

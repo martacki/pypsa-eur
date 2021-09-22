@@ -327,6 +327,10 @@ rule prepare_coarse_network:
     script: "scripts/prepare_coarse_network.py"
 
 
+# dunno why the following ruleorder is necessary?
+ruleorder: prepare_and_solve_subproblem > prepare_and_solve_cntry_network
+
+
 rule prepare_and_solve_subproblem:
     input:
         network_fine="networks/elec_s_{clusters}_ec_lv1.0_{opts}.nc",
@@ -335,8 +339,7 @@ rule prepare_and_solve_subproblem:
     output:
         network_dec = "results/networks/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_lv1.0_{opts}.nc",
     log:
-        solver1 = "logs/prepare_and_solve_subproblem/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_lv1.0_{opts}_solver_dec.log",
-        solver2 = "logs/prepare_and_solve_subproblem/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_lv1.0_{opts}_solver_c.log",
+        solver = "logs/prepare_and_solve_subproblem/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_lv1.0_{opts}_solver.log",
         python = "logs/prepare_and_solve_subproblem/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_lv1.0_{opts}_python.log",
         memory = "logs/prepare_and_solve_subproblem/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_lv1.0_{opts}_memory.log"
     benchmark: "benchmarks/prepare_and_solve_subproblem/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_lv1.0_{opts}"
@@ -344,6 +347,41 @@ rule prepare_and_solve_subproblem:
     resources: mem=(lambda w: 5000 + 372 * int(w.clusters))
     shadow: "shallow"
     script: "scripts/prepare_and_solve_subproblem.py"
+
+
+rule prepare_and_solve_cntry_network:
+    input: "networks/elec_s_{clusters}_ec_lv1.0_{opts}.nc"
+    output: "results/networks/elec_s_dec:{cntry}_{clusters}_ec_lv1.0_{opts}.nc"
+    log:
+        solver = "logs/prepare_and_solve_cntry_network/elec_s_dec:{cntry}_{clusters}_ec_lv1.0_{opts}_solver.log",
+        python = "logs/prepare_and_solve_cntry_network/elec_s_dec:{cntry}_{clusters}_ec_lv1.0_{opts}_python.log",
+        memory = "logs/prepare_and_solve_cntry_network/elec_s_dec:{cntry}_{clusters}_ec_lv1.0_{opts}_memory.log"
+    benchmark: "benchmakrs/prepare_and_solve_cntry_network/elec_s_dec:{cntry}_{clusters}_ec_lv1.0_{opts}"
+    threads: 4
+    resources: mem=(lambda w: 5000 + 372 * int(w.clusters))
+    shadow: "shallow"
+    script: "scripts/prepare_and_solve_cntry_network.py"
+
+
+rule prepare_and_solve_cntry_network_lit:
+    input:
+        network = "networks/elec_s.nc",
+#        busmap_ref = "resources/busmap_elec_s_{refclusters}.csv",
+        busmap_fine = "resources/busmap_elec_s_{clusters}.csv",
+        busmap_dec = "resources/busmap_elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_l{ll}_{opts}.csv",
+        tech_costs=COSTS
+    output:
+        busmap = "resources/busmap_elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_l{ll}_{opts}_lit.csv",
+        network = "results/networks/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_l{ll}_{opts}_lit.nc"
+    log:
+        solver = "logs/prepare_and_solve_cntry_network_lit/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_l{ll}_{opts}_solver.log",
+        python = "logs/prepare_and_solve_cntry_network_lit/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_l{ll}_{opts}_python.log",
+        memory = "logs/prepare_and_solve_cntry_network_lit/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_l{ll}_{opts}_memory.log"
+    benchmark: "benchmakrs/prepare_and_solve_cntry_network_lit/elec_s_dec:{cntry}-ref:{refclusters}_{clusters}_ec_l{ll}_{opts}"
+    threads: 4
+    resources: mem=(lambda w: 5000 + 372 * int(w.clusters))
+    shadow: "shallow"
+    script: "scripts/prepare_and_solve_cntry_network_lit.py"
 
 
 rule plot_network:
